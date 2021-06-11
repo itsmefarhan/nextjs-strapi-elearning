@@ -57,7 +57,7 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                {user.educator && renderPath("/teach", "Teach")}
+                {user.educator && renderPath("/course/teach", "Teach")}
                 {renderPath("/user/dashboard", "Dashboard")}
                 <button
                   className="bg-yellow-500 text-white py-1 px-4 rounded-md"
@@ -87,7 +87,7 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              {user.educator && renderPath("/teach", "Teach")}
+              {user.educator && renderPath("/course/teach", "Teach")}
               {renderPath("/user/dashboard", "Dashboard")}
               <button
                 className="bg-red-500 text-white py-1 px-4 rounded-md"
