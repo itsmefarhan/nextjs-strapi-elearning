@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRouter } from "next/router";
 import Cookie from "js-cookie";
 import { parseCookies } from "nookies";
 import { gql } from "@apollo/client";
@@ -9,11 +10,14 @@ import NewLesson from "components/Course/NewLesson";
 import Lesson from "components/Course/Lesson";
 
 const Course = ({ course }) => {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [values, setValues] = useState({
     title: "",
     content: "",
   });
+
+  const [thecourse, setTheCourse] = useState(course);
 
   const [lessonIndex, setLessonIndex] = useState(0);
 
@@ -22,6 +26,8 @@ const Course = ({ course }) => {
   const { title, content } = values;
 
   const token = Cookie.get("elearning-jwt") && Cookie.get("elearning-jwt");
+  const user =
+    Cookie.get("elearning-user") && JSON.parse(Cookie.get("elearning-user"));
 
   const customStyles = {
     overlay: {
@@ -75,19 +81,85 @@ const Course = ({ course }) => {
       body: JSON.stringify(lessonResult),
     });
     await res.json();
+
     if (res.ok) {
+      setTheCourse({
+        ...course,
+        lessons: thecourse.lessons.concat(lessonResult),
+      });
       setValues({ title: "", content: "" });
       setIsOpen(false);
       setError(null);
     }
   };
 
+  // Delete lesson
+  const deleteLesson = async (lessonId) => {
+    const confirm = window.confirm("Delete Lesson?");
+    if (confirm) {
+      const res = await fetch(`${baseUrl}/lessons/${lessonId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      await res.json();
+      if (res.ok) {
+        const updatedLessons = thecourse.lessons.filter(
+          (lesson) => lesson.id !== lessonId
+        );
+        setTheCourse({ ...course, lessons: updatedLessons });
+      }
+    }
+  };
+
+  // Delete Course
+  const deleteCourse = async (course) => {
+    if (course.instructor.id !== user.id) {
+      alert("You don't have permission to delete this course.");
+      return;
+    } else {
+      if (course.published) {
+        alert("Once course is published, you cannot delete it.");
+        return;
+      }
+      const confirm = window.confirm("Delete Course?");
+
+      if (confirm) {
+        course.lessons?.map(async (lesson) => {
+          const res = await fetch(`${baseUrl}/lessons/${lesson.id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          await res.json();
+        });
+
+        const courseResponse = await fetch(`${baseUrl}/courses/${course.id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        await courseResponse.json();
+        if (courseResponse.ok) {
+          router.replace("/course/teach");
+        }
+      }
+    }
+  };
+
   return course ? (
     <div className="max-w-4xl mx-auto mt-20">
-      <RenderCourse course={course} />
+      <RenderCourse
+        course={thecourse}
+        deleteCourse={deleteCourse}
+        user={user}
+      />
       <hr />
       <NewLesson
-        course={course}
+        course={thecourse}
         openModal={openModal}
         closeModal={closeModal}
         customStyles={customStyles}
@@ -98,13 +170,14 @@ const Course = ({ course }) => {
         handleSubmit={handleSubmit}
       />
       {/* Display Lessons */}
-      {course.lessons?.map((lesson, i) => (
+      {thecourse.lessons?.map((lesson, i) => (
         <Lesson
           key={lesson.id}
           lesson={lesson}
           lessonIndex={lessonIndex}
           setLessonIndex={setLessonIndex}
           i={i}
+          deleteLesson={deleteLesson}
         />
       ))}
     </div>
@@ -119,14 +192,14 @@ export const getServerSideProps = async (ctx) => {
   const user = authData["elearning-user"];
   const parsedUser = user && JSON.parse(user);
 
-  if (!parsedUser.educator) {
-    return {
-      redirect: {
-        destination: "/",
-        permanent: false,
-      },
-    };
-  }
+  // if (!parsedUser.educator) {
+  //   return {
+  //     redirect: {
+  //       destination: "/",
+  //       permanent: false,
+  //     },
+  //   };
+  // }
 
   const { data } = await client.query({
     query: gql`

@@ -8,16 +8,16 @@ import slugify from "slugify";
 import { buttonClasses, inputClasses } from "components/ReusableClasses";
 import { baseUrl } from "utils/baseUrl";
 
-const NewCourse = ({ categories, parsedUser }) => {
+const EditCourse = ({ categories, course, parsedUser }) => {
   const token = Cookie.get("elearning-jwt") && Cookie.get("elearning-jwt");
   const router = useRouter();
 
   const [values, setValues] = useState({
-    title: "",
-    description: "",
-    category: "",
+    title: course?.title,
+    description: course?.description,
+    category: course?.category.title,
     image: "",
-    price: "",
+    price: course?.price,
   });
   const [error, setError] = useState(null);
 
@@ -29,7 +29,7 @@ const NewCourse = ({ categories, parsedUser }) => {
   };
 
   const handleSubmit = async () => {
-    if (!title || !description || !category || !image || !price) {
+    if (!title || !description || !category || !price) {
       setError("All fields are required");
       return;
     }
@@ -43,16 +43,15 @@ const NewCourse = ({ categories, parsedUser }) => {
       price,
       instructor: parsedUser.id,
     };
-    const formData = new FormData();
-    formData.append("files.image", image);
-    formData.append("data", JSON.stringify(data));
     setError(null);
-    const res = await fetch(`${baseUrl}/courses`, {
-      method: "POST",
+
+    const res = await fetch(`${baseUrl}/courses/${course.id}`, {
+      method: "PUT",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: formData,
+      body: JSON.stringify(data),
     });
     const result = await res.json();
     if (res.ok) {
@@ -72,7 +71,7 @@ const NewCourse = ({ categories, parsedUser }) => {
   return (
     <div className="mt-20 py-3 px-10 max-w-lg mx-auto shadow-md bg-white">
       <h3 className="text-2xl font-medium text-center mb-3 text-gray-500">
-        Create New Course
+        Edit Course
       </h3>
       <div className="mb-3 text-center">
         <input
@@ -135,14 +134,14 @@ const NewCourse = ({ categories, parsedUser }) => {
       {error && <div className="mb-3 text-center text-red-500">{error}</div>}
       <div className="mb-3 text-center">
         <button className={buttonClasses()} onClick={handleSubmit}>
-          Create
+          Update
         </button>
       </div>
     </div>
   );
 };
 
-export default NewCourse;
+export default EditCourse;
 
 export const getServerSideProps = async (ctx) => {
   const authData = parseCookies(ctx);
@@ -158,6 +157,7 @@ export const getServerSideProps = async (ctx) => {
       },
     };
   }
+
   const { data } = await client.query({
     query: gql`
       {
@@ -165,10 +165,43 @@ export const getServerSideProps = async (ctx) => {
           id
           title
         }
+        courses(where: { slug: "${ctx.query.slug}" }) {
+          id
+          slug
+          title
+          description
+          price          
+          category {
+            title
+            id
+          }
+          image {
+            url
+          }
+          instructor {
+            username
+            id
+          }
+          lessons {
+            id
+            title
+            content
+          }
+        }
       }
     `,
   });
+
+  if (data.courses[0].instructor.id !== parsedUser.id) {
+    return {
+      redirect: {
+        destination: "/",
+        permanent: false,
+      },
+    };
+  }
+
   return {
-    props: { categories: data.categories, parsedUser },
+    props: { categories: data.categories, course: data.courses[0], parsedUser },
   };
 };

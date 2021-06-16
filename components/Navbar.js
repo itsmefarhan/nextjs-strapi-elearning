@@ -2,7 +2,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import Cookie from "js-cookie";
-import MenuSvg from "./MenuSvg";
+import MenuSvg from "./Svg/MenuSvg";
 
 const Navbar = () => {
   const router = useRouter();
